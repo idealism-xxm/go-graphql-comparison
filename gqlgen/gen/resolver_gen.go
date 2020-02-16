@@ -15,6 +15,9 @@ func (r *Resolver) Mutation() MutationResolver {
 func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
 }
+func (r *Resolver) Todo() TodoResolver {
+	return &todoResolver{r}
+}
 
 type mutationResolver struct{ *Resolver }
 
@@ -28,5 +31,11 @@ func (r *mutationResolver) ToggleTodo(ctx context.Context, id string) (*ToggleTo
 type queryResolver struct{ *Resolver }
 
 func (r *queryResolver) Todos(ctx context.Context) ([]*models.Todo, error) {
+	panic("not implemented")
+}
+
+type todoResolver struct{ *Resolver }
+
+func (r *todoResolver) ID(ctx context.Context, obj *models.Todo) (string, error) {
 	panic("not implemented")
 }

@@ -17,3 +17,6 @@ autobind: []
 models:
   Todo:
     model: go-graphql-comparison/models.Todo
+    fields:
+      id:
+        resolver: true

@@ -37,6 +37,7 @@ type Config struct {
 type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Todo() TodoResolver
 }
 
 type DirectiveRoot struct {
@@ -54,7 +55,7 @@ type ComplexityRoot struct {
 
 	Todo struct {
 		Completed func(childComplexity int) int
-		Id        func(childComplexity int) int
+		ID        func(childComplexity int) int
 		Text      func(childComplexity int) int
 	}
 
@@ -70,6 +71,9 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Todos(ctx context.Context) ([]*models.Todo, error)
+}
+type TodoResolver interface {
+	ID(ctx context.Context, obj *models.Todo) (string, error)
 }
 
 type executableSchema struct {
@@ -126,11 +130,11 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		return e.complexity.Todo.Completed(childComplexity), true
 
 	case "Todo.id":
-		if e.complexity.Todo.Id == nil {
+		if e.complexity.Todo.ID == nil {
 			break
 		}
 
-		return e.complexity.Todo.Id(childComplexity), true
+		return e.complexity.Todo.ID(childComplexity), true
 
 	case "Todo.text":
 		if e.complexity.Todo.Text == nil {
@@ -555,13 +559,13 @@ func (ec *executionContext) _Todo_id(ctx context.Context, field graphql.Collecte
 		Object:   "Todo",
 		Field:    field,
 		Args:     nil,
-		IsMethod: false,
+		IsMethod: true,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Id, nil
+		return ec.resolvers.Todo().ID(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -573,10 +577,10 @@ func (ec *executionContext) _Todo_id(ctx context.Context, field graphql.Collecte
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int)
+	res := resTmp.(string)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNID2int(ctx, field.Selections, res)
+	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Todo_text(ctx context.Context, field graphql.CollectedField, obj *models.Todo) (ret graphql.Marshaler) {
@@ -1999,19 +2003,28 @@ func (ec *executionContext) _Todo(ctx context.Context, sel ast.SelectionSet, obj
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Todo")
 		case "id":
-			out.Values[i] = ec._Todo_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Todo_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "text":
 			out.Values[i] = ec._Todo_text(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "completed":
 			out.Values[i] = ec._Todo_completed(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -2314,20 +2327,6 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 
 func (ec *executionContext) unmarshalNCreateTodoInput2goᚑgraphqlᚑcomparisonᚋgqlgenᚋgenᚐCreateTodoInput(ctx context.Context, v interface{}) (CreateTodoInput, error) {
 	return ec.unmarshalInputCreateTodoInput(ctx, v)
-}
-
-func (ec *executionContext) unmarshalNID2int(ctx context.Context, v interface{}) (int, error) {
-	return graphql.UnmarshalIntID(v)
-}
-
-func (ec *executionContext) marshalNID2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
-	res := graphql.MarshalIntID(v)
-	if res == graphql.Null {
-		if !ec.HasError(graphql.GetResolverContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-	}
-	return res
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
